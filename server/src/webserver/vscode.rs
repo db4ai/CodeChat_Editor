@@ -48,9 +48,8 @@ use crate::{
     queue_send,
     webserver::{
         INITIAL_MESSAGE_ID, MESSAGE_ID_INCREMENT, ProcessingTaskHttpRequest, ResultOkTypes,
-        UpdateMessageContents, escape_html, filesystem_endpoint, html_wrapper,
-        make_simple_http_response, path_to_url, text_file_to_response, try_canonicalize,
-        url_to_path,
+        UpdateMessageContents, escape_html, file_to_response, filesystem_endpoint, html_wrapper,
+        make_simple_http_response, path_to_url, try_canonicalize, url_to_path,
     },
 };
 
@@ -360,7 +359,7 @@ pub async fn vscode_ide_websocket(
                                 // Process the file contents.
                                 let (simple_http_response, option_update) = match file_contents_option {
                                     Some(file_contents) =>
-                                        text_file_to_response(&http_request, &current_file, &http_request.file_path, file_contents).await,
+                                        file_to_response(&http_request, &current_file, &http_request.file_path, Some(file_contents)).await,
                                     None => {
                                         // The file wasn't available in the IDE.
                                         // Look for it in the filesystem.
@@ -404,6 +403,8 @@ pub async fn vscode_ide_websocket(
                                                         }));
                                                         Ok(ResultOkTypes::Void)
                                                     }
+                                                    // TODO
+                                                    TranslationResultsString::Binary => Err("TODO".to_string()),
                                                     TranslationResultsString::Err(err) => Err(format!("Error translating source to CodeChat: {err}").to_string()),
                                                     TranslationResultsString::Unknown => {
                                                         // Send the new raw contents.

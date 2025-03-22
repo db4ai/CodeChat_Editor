@@ -308,7 +308,8 @@ const get_client = () => root_iframe?.contentWindow?.CodeChatEditor;
 const set_content = (contents: CodeChatForWeb) => {
     let client = get_client();
     if (client === undefined) {
-        let cw = root_iframe!.contentWindow!;
+        // See if this is the [simple viewer](#Client-simple-viewer). Otherwise, it's just the bare document to replace.
+        const cw = (root_iframe!.contentDocument?.getElementById("CodeChat-contents") as HTMLIFrameElement | undefined)?.contentWindow ?? root_iframe!.contentWindow!;
         cw.document.open();
         cw.document.write(contents.source.doc);
         cw.document.close();

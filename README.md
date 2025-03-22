@@ -58,10 +58,10 @@ References to other files
 The CodeChat Editor supports hyperlinks to any recognized file type; to refer to
 another source file, simply insert a hyperlink to it. For example,
 
-| Source                                         | Rendered                            |
-| ---------------------------------------------- | ----------------------------------- |
+| Source | Rendered |
+| --- | --- |
 | `[docs/style_guide.cpp](docs/style_guide.cpp)` | [Style guide](docs/style_guide.cpp) |
-| `[LICENSE.md](LICENSE.md)`                     | [License](LICENSE.md)               |
+| `[LICENSE.md](LICENSE.md)` | [License](LICENSE.md) |
 
 As usual, hyperlinks are relative to the current file; to refer to the style
 guide, use `docs/style_guide.cpp`, since this file resides in the `docs/`
@@ -82,8 +82,8 @@ Likewise, the path to local images is relative to the current file's location
 (see the preceding diagram for the location of `monitor.png`). For example
 [\[1\]](#notes),
 
-| Source                              | Rendered                          |
-| ----------------------------------- | --------------------------------- |
+| Source | Rendered |
+| --- | --- |
 | `![Monitor icon](docs/monitor.png)` | ![Monitor icon](docs/monitor.png) |
 
 Although the CodeChat Editor allows drag-and-drop of images, the result is a
@@ -109,12 +109,12 @@ mathematics. Place the delimiters `$` or `\\(` and `\\)` immediately before and
 after in-line mathematics; place `$$` or `\\\[` and `\\\]` immediately before
 and after displayed mathematics. For example,
 
-| Source                                        | Rendered                                    |
-| --------------------------------------------- | ------------------------------------------- |
+| Source | Rendered |
+| --- | --- |
 | `$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$` | $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$ |
-| `\\(a^2\\)`                                   | \\(a^2\\)                                   |
-| `$$a^2$$`                                     | $$a^2$$                                     |
-| `\\\[a^2\\\]`                                 | \\\[a^2\\\]                                 |
+| `\\(a^2\\)` | \\(a^2\\) |
+| `$$a^2$$` | $$a^2$$ |
+| `\\\[a^2\\\]` | \\\[a^2\\\] |
 
 See [Latex Mathematics](https://en.wikibooks.org/wiki/LaTeX/Mathematics#Symbols)
 for the syntax used to write mathematics expressions.
@@ -125,23 +125,24 @@ Markdown recognizes several characters common in mathematical expressions; these
 must be backslash escaped when used in math expressions to avoid problems. The
 following characters should be escaped: `*`, `_`, `\`, `[`, `]`, `<`.
 
-| Wrong source     | Wrong rendered | Correct source     | Correctly Rendered |
-| ---------------- | -------------- | ------------------ | ------------------ |
-| `${a}_1, b_{2}$` | ${a}*1, b*{2}$ | `${a}\_1, b\_{2}$` | ${a}\_1, b\_{2}$   |
-| `$a*1, b*2$`     | $a*1, b*2$     | `$a\*1, b\*2$`     | $a\*1, b\*2$       |
-| `$[a](b)$`       | $[a](b)$       | `$\[a\](b)$`       | $\[a\](b)$         |
-| `$3 <a> b$`      | $3 <a>b$</a>   | `$3 \<a> b$`       | $3 \<a> b$         |
-| `$a \; b$`       | $a \; b$       | `$a \\; b$`        | $a \\; b$          |
+| Wrong source | Wrong rendered | Correct source | Correctly Rendered |
+| --- | --- | --- | --- |
+| `${a}_1, b_{2}$` | ${a}*1, b*{2}$ | `${a}\_1, b\_{2}$` | ${a}\_1, b\_{2}$ |
+| `$a*1, b*2$` | $a*1, b*2$ | `$a\*1, b\*2$` | $a\*1, b\*2$ |
+| `$[a](b)$` | $[a](b)$ | `$\[a\](b)$` | $\[a\](b)$ |
+| `$3 <a> b$` | $3 <a>b$</a> | `$3 \<a> b$` | $3 \<a> b$ |
+| `$a \; b$` | $a ; b$ | `$a \\; b$` | $a \\; b$ |
 
-## Diagrams
+Diagrams
+--------
 
 ### Graphviz
 
 The CodeChat Editor contains rudimentary support for diagrams created by
 [Graphviz](https://graphviz.org/). For example,
 
-| Source                                                         | Rendered                                                     |
-| -------------------------------------------------------------- | ------------------------------------------------------------ |
+| Source | Rendered |
+| --- | --- |
 | `<graphviz-graph graph="digraph { A -> B }"></graphviz-graph>` | <graphviz-graph graph="digraph { A -> B }"></graphviz-graph> |
 
 To edit these diagrams, use an [HTML entity
@@ -153,8 +154,8 @@ as [Edotor](https://edotor.net/).
 The CodeChat Editor contains rudimentary support for diagrams created by
 [Mermaid](https://mermaid.js.org/). For example,
 
-| Source                                        | Rendered                                       |
-| --------------------------------------------- | ---------------------------------------------- |
+| Source | Rendered |
+| --- | --- |
 | `<wc-mermaid>graph TD; A --> B;</wc-mermaid>` | <wc-mermaid>graph TD; A --&gt; B;</wc-mermaid> |
 
 To edit these diagrams, use an [HTML entity
@@ -166,8 +167,8 @@ editor](https://mermaid.live/).
 [PlantUML](https://plantuml.com/) transforms a hyperlink to a user-defined
 diagram directly to an SVG; for example,
 
-| Source                                                                                                                    | Rendered                                                                                                               |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Source | Rendered |
+| --- | --- |
 | `![Sample PlantUML diagram](https://www.plantuml.com/plantuml/svg/ SoWkIImgAStDuNBAJrBGjLDmpCbCJbMmKiX8pSd9vt98pKi1IW80)` | ![Sample PlantUML diagram](https://www.plantuml.com/plantuml/svg/SoWkIImgAStDuNBAJrBGjLDmpCbCJbMmKiX8pSd9vt98pKi1IW80) |
 
 To edit these diagrams, paste the URL into the [PlantUML web

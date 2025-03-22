@@ -74,7 +74,7 @@ use url::Url;
 // ### Local
 //use crate::capture::EventCapture;
 use crate::processing::{
-    CodeChatForWeb, TranslationResultsString, source_to_codechat_for_web_string,
+    CodeChatForWeb, TranslationResultsString, find_path_to_toc, source_to_codechat_for_web_string,
 };
 use filewatcher::{
     filewatcher_browser_endpoint, filewatcher_client_endpoint, filewatcher_root_fs_redirect,
@@ -104,12 +104,22 @@ struct WebsocketQueues {
 struct ProcessingTaskHttpRequest {
     /// The path of the file requested.
     file_path: PathBuf,
-    /// True if this file is a TOC.
-    is_toc: bool,
+    /// Flags for this file: none, TOC, raw.
+    flags: ProcessingTaskHttpRequestFlags,
     /// True if test mode is enabled.
     is_test_mode: bool,
     /// A queue to send the response back to the HTTP task.
     response_queue: oneshot::Sender<SimpleHttpResponse>,
+}
+
+#[derive(Debug, PartialEq)]
+enum ProcessingTaskHttpRequestFlags {
+    // No flags provided.
+    None,
+    // This file is a TOC.
+    Toc,
+    /// This should be sent as the raw file.
+    Raw,
 }
 
 /// Since an `HttpResponse` doesn't implement `Send`, use this as a proxy to
@@ -544,9 +554,22 @@ pub async fn filesystem_endpoint(
         web::Query<HashMap<String, String>>,
         actix_web::error::QueryPayloadError,
     > = web::Query::<HashMap<String, String>>::from_query(req.query_string());
-    let is_toc =
-        query_params.is_ok_and(|query| query.get("mode").is_some_and(|mode| mode == "toc"));
+    let is_toc = query_params
+        .as_ref()
+        .is_ok_and(|query| query.get("mode").is_some_and(|mode| mode == "toc"));
+    let is_raw = query_params
+        .as_ref()
+        .is_ok_and(|query| query.get("raw").is_some());
     let is_test_mode = get_test_mode(req);
+    let flags = if is_toc {
+        // Both flags should never be set.
+        assert!(!is_raw);
+        ProcessingTaskHttpRequestFlags::Toc
+    } else if is_raw {
+        ProcessingTaskHttpRequestFlags::Raw
+    } else {
+        ProcessingTaskHttpRequestFlags::None
+    };
 
     // Create a one-shot channel used by the processing task to provide a
     // response to this request.
@@ -570,7 +593,7 @@ pub async fn filesystem_endpoint(
     if let Err(err) = processing_tx
         .send(ProcessingTaskHttpRequest {
             file_path,
-            is_toc,
+            flags,
             is_test_mode,
             response_queue: tx,
         })
@@ -636,12 +659,17 @@ async fn make_simple_http_response(
             let mut file_contents = String::new();
             match fc.read_to_string(&mut file_contents).await {
                 // If this is a binary file (meaning we can't read the contents
-                // as UTF-8), just serve it raw; assume this is an
-                // image/video/etc.
-                Err(_) => (SimpleHttpResponse::Bin(file_path.clone()), None),
+                // as UTF-8), send the contents as none to signal this isn't a
+                // text file.
+                Err(_) => file_to_response(http_request, current_filepath, file_path, None).await,
                 Ok(_) => {
-                    text_file_to_response(http_request, current_filepath, file_path, &file_contents)
-                        .await
+                    file_to_response(
+                        http_request,
+                        current_filepath,
+                        file_path,
+                        Some(&file_contents),
+                    )
+                    .await
                 }
             }
         }
@@ -652,7 +680,7 @@ async fn make_simple_http_response(
 // file contents itself (if it's not editable by the Client). If responding with
 // a Client, also return an Update message which will provided the contents for
 // the Client.
-async fn text_file_to_response(
+async fn file_to_response(
     // The HTTP request presented to the processing task.
     http_request: &ProcessingTaskHttpRequest,
     // Path to the file currently being edited. This path should be cleaned by
@@ -661,8 +689,8 @@ async fn text_file_to_response(
     // Path to this text file. This path should be cleaned by
     // `try_canonicalize`.
     file_path: &Path,
-    // Contents of this text file.
-    file_contents: &str,
+    // Contents of this file, if it's text; None if it was binary data.
+    file_contents: Option<&str>,
 ) -> (
     // The response to send back to the HTTP endpoint.
     SimpleHttpResponse,
@@ -709,18 +737,103 @@ async fn text_file_to_response(
     // Compare these files, since both have been canonicalized by
     // `try_canonical`.
     let is_current_file = file_path == current_filepath;
-    let (translation_results_string, path_to_toc) = if is_current_file || http_request.is_toc {
-        source_to_codechat_for_web_string(file_contents, file_path, http_request.is_toc)
+    let is_toc = http_request.flags == ProcessingTaskHttpRequestFlags::Toc;
+    let (translation_results_string, path_to_toc) = if let Some(file_contents_text) = file_contents
+    {
+        if is_current_file || is_toc {
+            source_to_codechat_for_web_string(file_contents_text, file_path, is_toc)
+        } else {
+            // If this isn't the current file, then don't parse it.
+            (TranslationResultsString::Unknown, None)
+        }
     } else {
-        // If this isn't the current file, then don't parse it.
-        (TranslationResultsString::Unknown, None)
+        (
+            TranslationResultsString::Binary,
+            find_path_to_toc(file_path),
+        )
     };
+    let is_project = path_to_toc.is_some();
+    // For project files, add in the sidebar. Convert this from a Windows path
+    // to a Posix path if necessary.
+    let (sidebar_iframe, sidebar_css) = if is_project {
+        (
+            format!(
+                r#"<iframe src="{}?mode=toc" id="CodeChat-sidebar"></iframe>"#,
+                path_to_toc.unwrap().to_slash_lossy()
+            ),
+            format!(
+                r#"<link rel="stylesheet" href="/{}">"#,
+                *CODECHAT_EDITOR_PROJECT_CSS
+            ),
+        )
+    } else {
+        ("".to_string(), "".to_string())
+    };
+
+    // Do we need to respond with a [simple viewer](#Client-simple-viewer)?
+    if (translation_results_string == TranslationResultsString::Binary
+        || translation_results_string == TranslationResultsString::Unknown)
+        && is_project
+        && is_current_file
+        && http_request.flags != ProcessingTaskHttpRequestFlags::Raw
+    {
+        return (
+            SimpleHttpResponse::Ok(formatdoc!(
+                r#"
+                <!DOCTYPE html>
+                <html lang="en">
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                        <title>{name} - The CodeChat Editor</title>
+                        <link rel="stylesheet" href="/{codehat_editor_css}">
+                        <script>
+                            const on_navigate = (navigateEvent) => {{
+                                if (navigateEvent.hashChange ||
+                                    navigateEvent.downloadRequest ||
+                                    navigateEvent.formData ||
+                                    !navigateEvent.canIntercept
+                                ) {{
+                                    return;
+                                }}
+                                navigateEvent.intercept();
+                                navigation.removeEventListener("navigate", on_navigate);
+                                parent.window.CodeChatEditorFramework.webSocketComm.current_file(new URL(navigateEvent.destination.url));
+                            }};
+                            
+                            const on_load_func = () => {{
+                                document.getElementById("CodeChat-sidebar").contentWindow.navigation.addEventListener("navigate", on_navigate);
+                            }};
+                            if (document.readyState === "loading") {{
+                                document.addEventListener("DOMContentLoaded", on_load_func);
+                            }} else {{
+                                on_load_func();
+                            }}
+                        </script>
+                        {sidebar_css}
+                    </head>
+                    <body class="CodeChat-theme-light">
+                        <p><a href="test.me">A link</a></p>
+                        {sidebar_iframe}
+                        <iframe src="{}?raw" style="height: 100vh" id="CodeChat-contents"></iframe>
+                    </body>
+                </html>"#,
+                file_name.to_string_lossy()
+            )),
+            None,
+        );
+    }
+
     let codechat_for_web = match translation_results_string {
+        // The file type is binary. Ask the HTTP server to serve it raw.
+        TranslationResultsString::Binary => return
+            (SimpleHttpResponse::Bin(file_path.to_path_buf()), None)
+        ,
         // The file type is unknown. Serve it raw.
         TranslationResultsString::Unknown => {
             return (
                 SimpleHttpResponse::Raw(
-                    file_contents.to_string(),
+                    file_contents.unwrap().to_string(),
                     mime_guess::from_path(file_path).first_or_text_plain(),
                 ),
                 None,
@@ -758,24 +871,6 @@ async fn text_file_to_response(
                 None,
             );
         }
-    };
-
-    let is_project = path_to_toc.is_some();
-    // For project files, add in the sidebar. Convert this from a Windows path
-    // to a Posix path if necessary.
-    let (sidebar_iframe, sidebar_css) = if is_project {
-        (
-            format!(
-                r#"<iframe src="{}?mode=toc" id="CodeChat-sidebar"></iframe>"#,
-                path_to_toc.unwrap().to_slash_lossy()
-            ),
-            format!(
-                r#"<link rel="stylesheet" href="/{}">"#,
-                *CODECHAT_EDITOR_PROJECT_CSS
-            ),
-        )
-    } else {
-        ("".to_string(), "".to_string())
     };
 
     // Add testing mode scripts if requested.
