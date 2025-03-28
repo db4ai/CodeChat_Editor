@@ -37,7 +37,7 @@ extension). Specifically, this screenshot shows:
 Code](../../../../../../../Users/davidbeam/Documents/Source%20Code/Literate%20Programming/CodeChat_Editor/docs/code-blocks-doc-blocks.png)
 
 See the [style
-guide](../../../../../../../Users/davidbeam/Documents/Source%20Code/Literate%20Programming/CodeChat_Editor/docs/style_guide.cpp)
+guide](./Users/davidbeam/Documents/Source%20Code/Literate%20Programming/CodeChat_Editor/docs/style_guide.cpp)
 for more examples.
 
 ## Editing
